@@ -27,10 +27,11 @@ The ``.ins`` files are LPJ-GUESS's own configuration and are not a knob to reach
 Branch off from existing LPJGuess restart
 =========================================
 
-In the esm_tools runscript yaml file, in the lpj_guess: section add:
+In the esm_tools runscript yaml file, in the ``lpj_guess:`` section add:
 
 .. code-block:: yaml
 
+    lresume: true
     ini_parent_exp_id: "AWIESM3_NTest309_Spinup_NoNlimitation_NoPatchdisturbances"
     ini_parent_date: "${prev_date}"
     ini_restart_dir: "/work/bb1469/a270270/runtime/awiesm3-v3.4/AWIESM3_NTest309_Spinup_NoNlimitation_NoPatchdisturbances/restart/lpj_guess"
@@ -38,7 +39,15 @@ In the esm_tools runscript yaml file, in the lpj_guess: section add:
         1:
             restart_in_sources:
                 state: /${ini_restart_dir}/lpjg_state_2037/*
-            restart_out_in_work:
-                state: /${work_dir}/lpjg_state_$(date -u -d "${initial_date}" +%Y)/*
 
-Modify ``ini_parent_exp_id``, ``ini_parent_date``, ``ini_restart_dir``, and ``state`` as needed for your use case.
+Modify ``ini_parent_exp_id``, ``ini_parent_date``, ``ini_restart_dir`` and the state year as needed for your use case.
+
+A state is named after the year it starts: a leg ending in 2036 writes ``lpjg_state_2037``. esm_tools reads ``lpjg_state_<parent year + 1>`` from ``ini_restart_dir`` and saves ``lpjg_state_<end year + 1>`` on its own, so the ``restart_in_sources`` override is only needed when the state you want is not the one that follows ``ini_parent_date``, as in this example. Do not override where the state is saved. An earlier version of this recipe also set ``restart_out_in_work: state: /${work_dir}/lpjg_state_$(date -u -d "${initial_date}" +%Y)/*``, which points the save at the state the first leg started from: the state LPJ-GUESS wrote is never kept, ``restart/lpj_guess/`` stays empty, and the second leg dies on an empty state:
+
+.. code-block:: none
+
+    Caught signal 11 (Segmentation fault: address not mapped to object at address 0x8)
+     1 0x00000000005a55ce GuessDeserializer::get_source_coordinates()  ???:0
+     2 0x00000000005780ee (anonymous namespace)::verify_exact_coupled_restart_grid()  framework.cpp:0
+
+To check it worked, look in the new experiment's ``restart/lpj_guess/`` after the first leg: there should be ``lpjg_state_<end year + 1>/`` with one ``.state`` file per LPJ-GUESS rank and a ``meta.bin``. If it is missing, the state is still in the first leg's ``work/``, under the same name.
